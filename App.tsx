@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Button, StyleSheet, Text, View } from 'react-native';
 
 type Position = {
   x: number;
@@ -241,11 +241,16 @@ const neighbors = (candidateTile: Tile, game: Game) => {
   ntiles = ntiles.filter(t => !(tiles(game.putTiles).some(pt => tileEq(pt, t))));
   // Filter out the ones that cannot pass putTiles
   if (orientation === "vertical") {
+    if (game.candidateTile && tileEq(game.candidateTile, candidateTile)) {
+      console.log("Vertical", ntiles);
+      console.log("PutTiles", game.putTiles);
+      console.log("CandidateTile", candidateTile);
+    }
     ntiles = ntiles.filter(t => !game.putTiles.some(pt => pt.t1.orientation === "horizontal" && pt.t1.x === t.x && pt.t1.y === t.y - 1));
-    ntiles = ntiles.filter(t => !game.putTiles.some(pt => pt.t1.orientation === "horizontal" && pt.t1.x === t.x && pt.t1.y === t.y));
+    ntiles = ntiles.filter(t => !game.putTiles.some(pt => pt.t1.orientation === "horizontal" && pt.t1.x === t.x && pt.t1.y === t.y - 2));
   } else {
     ntiles = ntiles.filter(t => !game.putTiles.some(pt => pt.t1.orientation === "vertical" && pt.t1.x === t.x - 1 && pt.t1.y === t.y));
-    ntiles = ntiles.filter(t => !game.putTiles.some(pt => pt.t1.orientation === "vertical" && pt.t1.x === t.x && pt.t1.y === t.y));
+    ntiles = ntiles.filter(t => !game.putTiles.some(pt => pt.t1.orientation === "vertical" && pt.t1.x === t.x - 2 && pt.t1.y === t.y));
   }
 
   return ntiles;
@@ -268,9 +273,13 @@ const gameReducer = (state: Game, action: any) => {
       if (!state.candidateTile) {
         return { ...state, candidateTile: action.target, neighborTiles: neighbors(action.target, state) };
       } else if (state.neighborTiles.some(t => tileEq(t, action.target))) {
-        return { ...state, putTiles: [...state.putTiles, putTile(state.candidateTile, action.target)], candidateTile: undefined, neighborTiles: [] };
+        const [blackTiles, whiteTiles] = state.turn === "white" ? [state.blackTiles, state.whiteTiles - 1] : [state.blackTiles - 1, state.whiteTiles];
+        const turn = state.turn === "white" ? "black" : "white";
+        return { ...state, blackTiles, whiteTiles, turn, putTiles: [...state.putTiles, putTile(state.candidateTile, action.target)], candidateTile: undefined, neighborTiles: [] };
       }
       return state;
+    case "restart":
+      return game();
     default:
       return state;
   }
@@ -310,8 +319,8 @@ const Square = React.memo(
     const pawn = (state.whitePawn.x === column && state.whitePawn.y === row) ? state.whitePawn
       : (state.blackPawn.x === column && state.blackPawn.y === row) ? state.blackPawn
         : undefined;
-
-    const isAvailable = available.some(p => p.x === column && p.y === row);
+    
+    const isAvailable = !state.candidateTile && available.some(p => p.x === column && p.y === row);
     return (
       <View
         onTouchStart={() => {
@@ -362,8 +371,9 @@ const Tile = React.memo(
     const isNeighbor = state.neighborTiles.some(t => tileEq(t, { x: column, y: row, orientation }));
     const neighborTiles = neighbors({ x: column, y: row, orientation }, state);
     const hasNeighbor = neighborTiles.length > 0;
-    const shouldShow = state.candidateTile ? isPut || isCandidate || isNeighbor : hasNeighbor;
-    const color = isPut ? "#F4A261"
+    const hasTiles = state.turn === "white" ? state.whiteTiles > 0 : state.blackTiles > 0;
+    const shouldShow = state.candidateTile ? isPut || isCandidate || isNeighbor : hasTiles && hasNeighbor;
+    const color = isPut ? "#F40061"
                   : isCandidate ?  "#F40061"
                   : "#FFFFFF";
     return (
@@ -387,6 +397,30 @@ const Tile = React.memo(
           borderRadius: 6,
           borderColor: '#F4A261',
           borderWidth: shouldShow ? 1 : 0,
+        }}
+      >
+      </View>
+    );
+  }
+);
+
+
+
+const SideTile = React.memo(
+  ({empty}: {empty: boolean}) => {
+    let [width, height] = [5, 25];
+    const color = !empty ? "#F4A261" : "#FFFFFF";
+    return (
+      <View
+        style={{
+          width,
+          height,
+          backgroundColor: color,
+          margin: 1,
+          marginTop: 2,
+          borderRadius: 6,
+          borderColor: '#F4A261',
+          borderWidth: 1,
         }}
       >
       </View>
@@ -448,8 +482,36 @@ const Board = React.memo(
   () => {
     const { state, dispatch } = useGame();
     const available = availableMoves(state);
+    const gameOver = state.whitePawn.y === 8 || state.blackPawn.y === 0;
+
+    if (gameOver) {
+      return (
+        <View>
+          <Text>Game Over</Text>
+          <Text>{state.turn === "white" ? "Black" : "White"} wins!</Text>
+          <Button title="Restart" onPress={() => dispatch({ type: "restart" })} />
+        </View>
+      );
+    }
+
     return (
-      
+      <>
+      <View style={{ flexDirection: "row" }}>
+        {
+          Array(state.whiteTiles).fill(null).map((_, i) => (
+            <>
+              <SideTile empty={false} key={`whiteTile${i}`} />
+            </>
+          ))
+        }
+        {
+          Array(10 - state.whiteTiles).fill(null).map((_, i) => (
+            <>
+              <SideTile empty={true} key={`whiteTile${i}`} />
+            </>
+          ))
+        }
+      </View>
       <View>
         {
           Array(9).fill(null).map((_, i) => (
@@ -462,6 +524,23 @@ const Board = React.memo(
           ))
         }
       </View>
+      <View style={{ flexDirection: "row" }}>
+        {
+          Array(state.blackTiles).fill(null).map((_, i) => (
+            <>
+              <SideTile empty={false} key={`whiteTile${i}`} />
+            </>
+          ))
+        }
+        {
+          Array(10 - state.blackTiles).fill(null).map((_, i) => (
+            <>
+              <SideTile empty={true} key={`whiteTile${i}`} />
+            </>
+          ))
+        }
+      </View>
+      </>
     );
   }
 );
