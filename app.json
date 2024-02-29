@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "quoridor",
-    "slug": "quoridor",
+    "name": "koridor",
+    "slug": "koridor",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,7 +15,8 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.akeles.koridor"
     },
     "android": {
       "adaptiveIcon": {
@@ -25,6 +26,18 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "9620802c-75a6-4083-aa72-227c709c284d"
+      }
+    },
+    "owner": "akeles",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/9620802c-75a6-4083-aa72-227c709c284d"
     }
   }
 }
